@@ -1,4 +1,3 @@
-// Kopyalamaq üçün sağ yuxarıdakı "Copy" düyməsinə bas:
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,7 +5,49 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 
-void main() => runApp(const MaterialApp(home: MainScreen(), debugShowCheckedModeBanner: false));
+void main() => runApp(const MaterialApp(home: LoginScreen(), debugShowCheckedModeBanner: false));
+
+// ==========================================
+// 1. GİRİŞ (LOGIN) EKRANI
+// ==========================================
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Padding(
+        padding: const EdgeInsets.all(30.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.location_on, size: 80, color: Colors.green),
+            const SizedBox(height: 20),
+            const Text("MapTask Radar", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 40),
+            const TextField(decoration: InputDecoration(labelText: "Telefon nömrəsi", border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone))),
+            const SizedBox(height: 20),
+            const TextField(obscureText: true, decoration: InputDecoration(labelText: "Şifrə", border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock))),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
+                onPressed: () {
+                  // Giriş edəndən sonra MainScreen-ə (Xəritəyə) keçid
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainScreen()));
+                },
+                child: const Text("Daxil Ol", style: TextStyle(fontSize: 18)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 // ==========================================
 // KÖMƏKÇİ DƏYİŞƏNLƏR VƏ FUNKSİYALAR
@@ -96,7 +137,7 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 // ==========================================
-// YENİ: SİFARİŞLƏR VƏ TƏKLİFLƏR EKRANI
+// SİFARİŞLƏR VƏ TƏKLİFLƏR EKRANI
 // ==========================================
 class OrdersScreen extends StatelessWidget {
   const OrdersScreen({super.key});
@@ -131,7 +172,6 @@ class OrdersScreen extends StatelessWidget {
   }
 
   Widget _buildActiveOrders(BuildContext context) {
-    // Vizualizasiya üçün xəyali məlumatlar (Gələcəkdə bunlar serverdən gələcək)
     final List<Map<String, dynamic>> orders = [
       {
         "title": "Ofis əşyalarının daşınması",
@@ -221,7 +261,6 @@ class OrdersScreen extends StatelessWidget {
     );
   }
 
-  // Təklifləri göstərən Bottom Sheet
   void _showBidsModal(BuildContext context, Map<String, dynamic> order) {
     final bids = order['bids'] as List;
     showModalBottomSheet(
@@ -320,7 +359,7 @@ class OrdersScreen extends StatelessWidget {
 }
 
 // ==========================================
-// PROFİL EKRANI
+// PROFİL EKRANI VƏ ÇIXIŞ DÜYMƏSİ
 // ==========================================
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -368,9 +407,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('Profil', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)), 
         backgroundColor: Colors.white, 
         elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.notifications_none, color: Colors.black), onPressed: (){}),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -379,18 +415,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const CircleAvatar(radius: 50, backgroundColor: Colors.blueAccent, child: Icon(Icons.person, size: 50, color: Colors.white)),
             const SizedBox(height: 15),
             const Text("Rəşad Əliyev", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            const Text("+994 50 123 45 67", style: TextStyle(fontSize: 16, color: Colors.grey)),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ...List.generate(4, (index) => const Icon(Icons.star, color: Colors.amber, size: 24)),
-                const Icon(Icons.star_half, color: Colors.amber, size: 24),
-                const SizedBox(width: 8),
-                const Text("4.8", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
             const SizedBox(height: 30),
             Container(
               padding: const EdgeInsets.all(20),
@@ -412,7 +436,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
                           onPressed: _addBalanceDialog,
                           icon: const Icon(Icons.add_circle_outline),
-                          label: const Text("Mədaxil", style: TextStyle(fontSize: 16)),
+                          label: const Text("Mədaxil"),
                         ),
                       ),
                       const SizedBox(width: 15),
@@ -423,7 +447,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Çıxarış üçün minimum balans 20 AZN olmalıdır.")));
                           },
                           icon: const Icon(Icons.account_balance_wallet),
-                          label: const Text("Məxaric", style: TextStyle(fontSize: 16)),
+                          label: const Text("Məxaric"),
                         ),
                       ),
                     ],
@@ -433,32 +457,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 30),
             const Divider(),
-            ListTile(
-              leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle), child: const Icon(Icons.history, color: Colors.blue)),
-              title: const Text("Əməliyyat Tarixçəsi", style: TextStyle(fontWeight: FontWeight.w500)),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-              onTap: (){},
-            ),
-            ListTile(
-              leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.orange.shade50, shape: BoxShape.circle), child: const Icon(Icons.settings, color: Colors.orange)),
-              title: const Text("Tənzimləmələr", style: TextStyle(fontWeight: FontWeight.w500)),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-              onTap: (){},
-            ),
-            ListTile(
-              leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.purple.shade50, shape: BoxShape.circle), child: const Icon(Icons.help_outline, color: Colors.purple)),
-              title: const Text("Dəstək və Qaydalar", style: TextStyle(fontWeight: FontWeight.w500)),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-              onTap: (){},
-            ),
-            const Divider(),
-            const SizedBox(height: 20),
+            // ÇIXIŞ DÜYMƏSİ (LOGIN-Ə QAYITMAQ)
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade50, foregroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), elevation: 0),
-                onPressed: (){},
+                onPressed: () {
+                  // LOGIN EKRANINA QAYITMAQ KODU:
+                  Navigator.pushAndRemoveUntil(
+                    context, 
+                    MaterialPageRoute(builder: (_) => const LoginScreen()), 
+                    (route) => false
+                  );
+                },
                 child: const Text("Hesabdan Çıx", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
@@ -483,7 +495,6 @@ class _MapScreenState extends State<MapScreen> {
   List<TaskItem> tasks = [];
   final MapController _mapController = MapController();
   final LatLng _defaultLocation = const LatLng(40.4093, 49.8671);
-
   Set<TaskCategory> _selectedCategories = TaskCategory.values.toSet();
 
   void _createNewTask(LatLng point) async {
@@ -495,85 +506,53 @@ class _MapScreenState extends State<MapScreen> {
           location: point, category: res['cat'], radius: res['rad'], imagePath: res['image']
         ));
       });
-      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ İş xəritəyə uğurla əlavə edildi! (Görmək üçün xəritəni sürüşdürün)'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ İş xəritəyə əlavə edildi!'), backgroundColor: Colors.green));
       }
     }
   }
 
   void _showFilterModal() {
     showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      context: context, isScrollControlled: true,
       builder: (BuildContext ctx) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             bool isAllSelected = _selectedCategories.length == TaskCategory.values.length;
-
             return SingleChildScrollView(
               child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 20, 
-                  top: 20, left: 20, right: 20
-                ),
+                padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text("Hansı işləri görmək istəyirsiniz?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    const Divider(),
+                    const Text("Filtr", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     CheckboxListTile(
-                      title: const Text("Hamısını seç", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
-                      activeColor: Colors.blue,
+                      title: const Text("Hamısını seç", style: TextStyle(color: Colors.blue)),
                       value: isAllSelected,
-                      onChanged: (bool? value) {
+                      onChanged: (v) {
                         setModalState(() {
-                          if (value == true) {
-                            _selectedCategories.addAll(TaskCategory.values);
-                          } else {
-                            _selectedCategories.clear();
-                          }
+                          v == true ? _selectedCategories.addAll(TaskCategory.values) : _selectedCategories.clear();
                         });
                         setState(() {}); 
                       },
                     ),
                     const Divider(),
                     ...TaskCategory.values.map((cat) {
-                      final isChecked = _selectedCategories.contains(cat);
                       return CheckboxListTile(
-                        title: Text(getCategoryName(cat), style: const TextStyle(fontSize: 16)),
-                        activeColor: Colors.black,
-                        value: isChecked,
-                        onChanged: (bool? value) {
+                        title: Text(getCategoryName(cat)),
+                        value: _selectedCategories.contains(cat),
+                        onChanged: (v) {
                           setModalState(() {
-                            if (value == true) {
-                              _selectedCategories.add(cat);
-                            } else {
-                              _selectedCategories.remove(cat);
-                            }
+                            v == true ? _selectedCategories.add(cat) : _selectedCategories.remove(cat);
                           });
                           setState(() {}); 
                         },
                       );
                     }),
-                    const SizedBox(height: 15),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text("Tətbiq Et", style: TextStyle(fontSize: 16)),
-                      ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text("Tətbiq Et"),
                     )
                   ],
                 ),
@@ -595,10 +574,7 @@ class _MapScreenState extends State<MapScreen> {
         children: [
           FlutterMap(
             mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _defaultLocation, 
-              initialZoom: 13,
-            ),
+            options: MapOptions(initialCenter: _defaultLocation, initialZoom: 13),
             children: [
               TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
               CircleLayer(circles: displayedTasks.map((t) => CircleMarker(
@@ -606,58 +582,27 @@ class _MapScreenState extends State<MapScreen> {
                 color: t.color.withOpacity(0.2), borderColor: t.color, borderStrokeWidth: 2,
               )).toList()),
               MarkerLayer(markers: displayedTasks.map((t) => Marker(
-                point: t.location,
-                width: 50, height: 50,
+                point: t.location, width: 50, height: 50,
                 child: GestureDetector(
                   onTap: () => showModalBottomSheet(
-                    context: context, 
-                    isScrollControlled: true, 
-                    builder: (_) => SingleChildScrollView(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          bottom: MediaQuery.of(context).viewInsets.bottom + 20, 
-                          top: 20, left: 20, right: 20
-                        ),
-                        child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(t.icon, size: 50, color: t.color),
-                          Text(t.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                          Text("Sifarişçinin Büdcəsi: ${t.budget} AZN", style: const TextStyle(color: Colors.green, fontSize: 16)),
-                          const SizedBox(height: 10),
-                          Text(t.description),
-                          const SizedBox(height: 15),
-                          if (t.imagePath != null)
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: kIsWeb 
-                                  ? Image.network(t.imagePath!, height: 150, width: double.infinity, fit: BoxFit.cover)
-                                  : Image.file(File(t.imagePath!), height: 150, width: double.infinity, fit: BoxFit.cover),
-                            ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
-                              onPressed: () {
-                                Navigator.pop(context); 
-                                Navigator.push(context, MaterialPageRoute(builder: (_) => BiddingScreen(task: t))).then((result) {
-                                  if (result == true && mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('🎉 Təklifiniz sifarişçiyə göndərildi!'),
-                                        backgroundColor: Colors.blueAccent,
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-                                  }
-                                });
-                              }, 
-                              icon: const Icon(Icons.handshake), 
-                              label: const Text('Təklif Göndər', style: TextStyle(fontSize: 16))
-                            ),
-                          )
-                        ]),
-                      ),
+                    context: context, isScrollControlled: true, 
+                    builder: (_) => Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(t.icon, size: 50, color: t.color),
+                        Text(t.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                        Text("Büdcə: ${t.budget} AZN", style: const TextStyle(color: Colors.green, fontSize: 16)),
+                        const SizedBox(height: 10), Text(t.description),
+                        const SizedBox(height: 20),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
+                          onPressed: () {
+                            Navigator.pop(context); 
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => BiddingScreen(task: t)));
+                          }, 
+                          icon: const Icon(Icons.handshake), label: const Text('Təklif Göndər')
+                        )
+                      ]),
                     ),
                   ),
                   child: Container(
@@ -668,71 +613,14 @@ class _MapScreenState extends State<MapScreen> {
               )).toList()),
             ],
           ),
-
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: 40.0),
-              child: Icon(Icons.location_on, size: 50, color: Colors.black87),
-            ),
-          ),
-
-          Positioned(
-            top: 16, left: 16,
-            child: FloatingActionButton.extended(
-              heroTag: "btn_filter",
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black87,
-              icon: const Icon(Icons.filter_list),
-              label: Text(
-                _selectedCategories.length == TaskCategory.values.length ? "Filtr" : "Filtr (${_selectedCategories.length})", 
-                style: const TextStyle(fontWeight: FontWeight.bold)
-              ),
-              onPressed: _showFilterModal,
-            ),
-          ),
-
-          Positioned(
-            right: 16,
-            bottom: 100, 
-            child: Column(
-              children: [
-                FloatingActionButton.small(
-                  heroTag: "btn_center", backgroundColor: Colors.white,
-                  onPressed: () => _mapController.move(_defaultLocation, 13.0),
-                  child: const Icon(Icons.my_location, color: Colors.blue),
-                ),
-                const SizedBox(height: 10),
-                FloatingActionButton.small(
-                  heroTag: "btn_zoom_in", backgroundColor: Colors.white,
-                  onPressed: () => _mapController.move(_mapController.camera.center, _mapController.camera.zoom + 1),
-                  child: const Icon(Icons.add, color: Colors.black87),
-                ),
-                const SizedBox(height: 5),
-                FloatingActionButton.small(
-                  heroTag: "btn_zoom_out", backgroundColor: Colors.white,
-                  onPressed: () => _mapController.move(_mapController.camera.center, _mapController.camera.zoom - 1),
-                  child: const Icon(Icons.remove, color: Colors.black87),
-                ),
-              ],
-            ),
-          ),
-
+          const Center(child: Padding(padding: EdgeInsets.only(bottom: 40.0), child: Icon(Icons.location_on, size: 50, color: Colors.black87))),
+          Positioned(top: 16, left: 16, child: FloatingActionButton.extended(backgroundColor: Colors.white, foregroundColor: Colors.black, icon: const Icon(Icons.filter_list), label: Text("Filtr (${_selectedCategories.length})"), onPressed: _showFilterModal)),
           Positioned(
             bottom: 20, left: 20, right: 20,
-            child: SizedBox(
-              height: 55,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 5,
-                ),
-                onPressed: () {
-                  final currentCenter = _mapController.camera.center;
-                  _createNewTask(currentCenter);
-                },
-                child: const Text('Ünvanı Təsdiqlə', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade600, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              onPressed: () => _createNewTask(_mapController.camera.center),
+              child: const Text('Ünvanı Təsdiqlə', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
             ),
           ),
         ],
@@ -747,85 +635,30 @@ class _MapScreenState extends State<MapScreen> {
 class BiddingScreen extends StatefulWidget {
   final TaskItem task;
   const BiddingScreen({super.key, required this.task});
-
   @override
   State<BiddingScreen> createState() => _BiddingScreenState();
 }
 
 class _BiddingScreenState extends State<BiddingScreen> {
   final _priceController = TextEditingController();
-  final _timeController = TextEditingController();
-  final _messageController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _priceController.text = widget.task.budget;
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Təklif Göndər")),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(10)),
-              child: Row(
-                children: [
-                  Icon(widget.task.icon, size: 40, color: widget.task.color),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                        Text("Müştərinin büdcəsi: ${widget.task.budget} AZN", style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            TextField(controller: _priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "Təklifiniz (AZN)")),
             const SizedBox(height: 30),
-            const Text("Sizin təklif etdiyiniz qiymət (AZN)", style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            TextField(
-              controller: _priceController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "Məsələn: 45", prefixIcon: Icon(Icons.money)),
-            ),
-            const SizedBox(height: 20),
-            const Text("İşi nə qədər vaxta edərsiniz?", style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            TextField(
-              controller: _timeController,
-              decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "Məsələn: 2 saata, Yarım günə", prefixIcon: Icon(Icons.timer)),
-            ),
-            const SizedBox(height: 20),
-            const Text("Müştəriyə əlavə mesajınız", style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            TextField(
-              controller: _messageController,
-              maxLines: 3,
-              decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "Məsələn: Detalı özüm alıb dərhal yaxınlaşa bilərəm...", prefixIcon: Icon(Icons.message)),
-            ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                onPressed: () {
-                  Navigator.pop(context, true); 
-                }, 
-                icon: const Icon(Icons.send), 
-                label: const Text("Təklifi Təsdiqlə", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))
-              ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 55)),
+              onPressed: () {
+                Navigator.pop(context, true); 
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🎉 Təklifiniz göndərildi!'), backgroundColor: Colors.blueAccent));
+              }, 
+              child: const Text("Təsdiqlə")
             )
           ],
         ),
@@ -847,45 +680,24 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final _t = TextEditingController(), _d = TextEditingController(), _b = TextEditingController();
   TaskCategory _cat = TaskCategory.repair;
   double _rad = 5.0;
-  XFile? _selectedImage;
-  final ImagePicker _picker = ImagePicker();
-
-  Future<void> _pickImage(ImageSource source) async {
-    final picked = await _picker.pickImage(source: source);
-    if (picked != null) setState(() => _selectedImage = picked);
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Yeni İş Yarat')),
       body: SingleChildScrollView(padding: const EdgeInsets.all(20), child: Column(children: [
-        DropdownButtonFormField<TaskCategory>(value: _cat, items: TaskCategory.values.map((c) => 
-          DropdownMenuItem(value: c, child: Text(getCategoryName(c)))).toList(), onChanged: (v) => setState(() => _cat = v!)),
+        DropdownButtonFormField<TaskCategory>(value: _cat, items: TaskCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(getCategoryName(c)))).toList(), onChanged: (v) => setState(() => _cat = v!)),
         TextField(controller: _t, decoration: const InputDecoration(labelText: 'Başlıq')),
         TextField(controller: _d, decoration: const InputDecoration(labelText: 'Detallar')),
         TextField(controller: _b, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Məbləğ (AZN)')),
-        const SizedBox(height: 20),
-        Container(
-          width: double.infinity, padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(10)),
-          child: Column(children: [
-            _selectedImage == null ? const Text("İşin vəziyyətini göstərən şəkil əlavə edin") : const Text("Şəkil uğurla əlavə edildi!", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-              ElevatedButton.icon(onPressed: () => _pickImage(ImageSource.camera), icon: const Icon(Icons.camera_alt), label: const Text("Kamera")),
-              ElevatedButton.icon(onPressed: () => _pickImage(ImageSource.gallery), icon: const Icon(Icons.image), label: const Text("Qalereya")),
-            ]),
-          ]),
-        ),
         const SizedBox(height: 20),
         Text("Görünmə sahəsi: ${_rad.toInt()} km"),
         Slider(value: _rad, min: 1, max: 20, divisions: 19, onChanged: (v) => setState(() => _rad = v)),
         ElevatedButton(
           style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: Colors.black, foregroundColor: Colors.white),
-          onPressed: () => Navigator.pop(context, {
-          'title': _t.text, 'desc': _d.text, 'budget': _b.text, 'cat': _cat, 'rad': _rad, 'image': _selectedImage?.path
-        }), child: const Text("Təsdiqlə", style: TextStyle(fontSize: 18),))
+          onPressed: () => Navigator.pop(context, {'title': _t.text, 'desc': _d.text, 'budget': _b.text, 'cat': _cat, 'rad': _rad, 'image': null}), 
+          child: const Text("Təsdiqlə")
+        )
       ])),
     );
   }
