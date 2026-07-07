@@ -29,7 +29,12 @@ class TaskItem {
   final LatLng location;
   final TaskCategory category;
   final double radius;
-  final String? imagePath;
+  
+  // YENİ: Şəkil və videoların yadda saxlanması üçün siyahı
+  final List<String>? mediaFiles; 
+  
+  final LatLng? dropoffLocation; 
+  final Map<String, String>? extraDetails; 
 
   TaskItem({
     required this.title, 
@@ -38,44 +43,30 @@ class TaskItem {
     required this.location, 
     required this.category, 
     required this.radius, 
-    this.imagePath
+    this.mediaFiles,
+    this.dropoffLocation,
+    this.extraDetails,
   });
 
   Color get color => switch(category) {
-        TaskCategory.delivery => Colors.blue,
-        TaskCategory.repair => Colors.orange,
-        TaskCategory.auto => Colors.red,
-        TaskCategory.autoParts => Colors.redAccent,
-        TaskCategory.cleaning => Colors.teal,
-        TaskCategory.helper => Colors.brown,
-        TaskCategory.tech => Colors.deepPurple,
-        TaskCategory.photoDrone => Colors.indigo,
-        TaskCategory.shopping => Colors.green,
-        TaskCategory.office => Colors.blueGrey,
-        TaskCategory.petCare => Colors.amber,
-        TaskCategory.beauty => Colors.pink,
-        TaskCategory.realEstate => Colors.cyan,
-        TaskCategory.sales => Colors.deepOrange,
-        TaskCategory.needs => Colors.pinkAccent,
-        TaskCategory.other => Colors.grey,
+        TaskCategory.delivery => Colors.blue, TaskCategory.repair => Colors.orange,
+        TaskCategory.auto => Colors.red, TaskCategory.autoParts => Colors.redAccent,
+        TaskCategory.cleaning => Colors.teal, TaskCategory.helper => Colors.brown,
+        TaskCategory.tech => Colors.deepPurple, TaskCategory.photoDrone => Colors.indigo,
+        TaskCategory.shopping => Colors.green, TaskCategory.office => Colors.blueGrey,
+        TaskCategory.petCare => Colors.amber, TaskCategory.beauty => Colors.pink,
+        TaskCategory.realEstate => Colors.cyan, TaskCategory.sales => Colors.deepOrange,
+        TaskCategory.needs => Colors.pinkAccent, TaskCategory.other => Colors.grey,
       };
 
   IconData get icon => switch(category) {
-        TaskCategory.delivery => Icons.local_shipping,
-        TaskCategory.repair => Icons.plumbing,
-        TaskCategory.auto => Icons.car_crash,
-        TaskCategory.autoParts => Icons.settings_suggest,
-        TaskCategory.cleaning => Icons.cleaning_services,
-        TaskCategory.helper => Icons.fitness_center,
-        TaskCategory.tech => Icons.computer,
-        TaskCategory.photoDrone => Icons.camera_alt,
-        TaskCategory.shopping => Icons.shopping_cart,
-        TaskCategory.office => Icons.business_center,
-        TaskCategory.petCare => Icons.pets,
-        TaskCategory.beauty => Icons.face_retouching_natural,
-        TaskCategory.realEstate => Icons.apartment,
-        TaskCategory.sales => Icons.sell,
-        TaskCategory.needs => Icons.volunteer_activism,
-        TaskCategory.other => Icons.work,
+        TaskCategory.delivery => Icons.local_shipping, TaskCategory.repair => Icons.plumbing,
+        TaskCategory.auto => Icons.car_crash, TaskCategory.autoParts => Icons.settings_suggest,
+        TaskCategory.cleaning => Icons.cleaning_services, TaskCategory.helper => Icons.fitness_center,
+        TaskCategory.tech => Icons.computer, TaskCategory.photoDrone => Icons.camera_alt,
+        TaskCategory.shopping => Icons.shopping_cart, TaskCategory.office => Icons.business_center,
+        TaskCategory.petCare => Icons.pets, TaskCategory.beauty => Icons.face_retouching_natural,
+        TaskCategory.realEstate => Icons.apartment, TaskCategory.sales => Icons.sell,
+        TaskCategory.needs => Icons.volunteer_activism, TaskCategory.other => Icons.work,
       };
 }

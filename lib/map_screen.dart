@@ -19,7 +19,11 @@ class _MapScreenState extends State<MapScreen> {
   void _createNewTask(LatLng point) async {
     final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddTaskScreen()));
     if (res != null && res is Map<String, dynamic>) {
-      setState(() => tasks.add(TaskItem(title: res['title'], description: res['desc'], budget: res['budget'], location: point, category: res['cat'], radius: res['rad'], imagePath: res['image'])));
+      setState(() => tasks.add(TaskItem(
+        title: res['title'], description: res['desc'], budget: res['budget'], 
+        location: point, category: res['cat'], radius: res['rad'], 
+        mediaFiles: res['media'], dropoffLocation: res['dropoff'], extraDetails: res['extras']
+      )));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ İş xəritəyə əlavə edildi!'), backgroundColor: Colors.green));
     }
   }
@@ -48,6 +52,105 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  void _showTaskDetails(BuildContext context, TaskItem t) {
+    showModalBottomSheet(
+      context: context, 
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: t.color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(t.icon, color: t.color, size: 24)),
+                const SizedBox(width: 12),
+                Text(getCategoryName(t.category), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: t.color)),
+                const Spacer(),
+                Text("${t.budget} AZN", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(t.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            
+            if (t.category == TaskCategory.delivery && t.dropoffLocation != null) ...[
+               Container(
+                 padding: const EdgeInsets.all(16),
+                 decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12)),
+                 child: Column(
+                   children: [
+                     const Row(children: [Icon(Icons.circle, size: 12, color: Colors.blue), SizedBox(width: 10), Text("Götürülmə nöqtəsi (A)", style: TextStyle(fontWeight: FontWeight.bold))]),
+                     Container(margin: const EdgeInsets.only(left: 5, top: 4, bottom: 4), height: 20, width: 2, color: Colors.blue.shade200),
+                     const Row(children: [Icon(Icons.location_on, size: 14, color: Colors.red), SizedBox(width: 8), Text("Çatdırılma nöqtəsi (B)", style: TextStyle(fontWeight: FontWeight.bold))]),
+                     const Divider(height: 20),
+                     Row(
+                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                       children: [
+                         const Text("Məsafə:", style: TextStyle(color: Colors.black54)),
+                         Text("${const Distance().as(LengthUnit.Kilometer, t.location, t.dropoffLocation!).toStringAsFixed(1)} km", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)),
+                       ],
+                     )
+                   ],
+                 ),
+               ),
+               const SizedBox(height: 12),
+            ] 
+            else if (t.category == TaskCategory.realEstate && t.extraDetails != null) ...[
+              Wrap(
+                spacing: 10,
+                children: t.extraDetails!.entries.map((e) => Chip(
+                  backgroundColor: Colors.cyan.shade50,
+                  side: BorderSide(color: Colors.cyan.shade100),
+                  label: Text("${e.key}: ${e.value}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
+                )).toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            Text(t.description, style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.4)),
+            const SizedBox(height: 20),
+
+            // YENİ BÖLMƏ: Şəkil və Videoların Görünməsi
+            if (t.mediaFiles != null && t.mediaFiles!.isNotEmpty) ...[
+              const Text("İşin faylları:", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 80,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: t.mediaFiles!.length,
+                  itemBuilder: (ctx, i) => Container(
+                    width: 80, height: 80,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      image: DecorationImage(image: NetworkImage(t.mediaFiles![i]), fit: BoxFit.cover),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)]
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            const SizedBox(height: 10),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), 
+              onPressed: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => BiddingScreen(task: t))); }, 
+              child: const Text('Təklif Göndər', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
+            )
+          ]
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final displayedTasks = tasks.where((t) => _selectedCategories.contains(t.category)).toList();
@@ -63,9 +166,7 @@ class _MapScreenState extends State<MapScreen> {
               MarkerLayer(markers: displayedTasks.map((t) => Marker(
                 point: t.location, width: 50, height: 50,
                 child: GestureDetector(
-                  onTap: () => showModalBottomSheet(
-                    context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(t.icon, size: 50, color: t.color), Text(t.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), Text("Büdcə: ${t.budget} AZN", style: const TextStyle(color: Colors.green, fontSize: 16)), const SizedBox(height: 10), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)), onPressed: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => BiddingScreen(task: t))); }, child: const Text('Təklif Göndər'))])),
-                  ),
+                  onTap: () => _showTaskDetails(context, t), 
                   child: Container(decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)]), child: Icon(t.icon, color: t.color, size: 30)),
                 ),
               )).toList()),
