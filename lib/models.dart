@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
-enum TaskCategory { delivery, repair, auto, autoParts, cleaning, helper, tech, photoDrone, shopping, office, petCare, beauty, other }
+enum TaskCategory { delivery, repair, auto, autoParts, cleaning, helper, tech, photoDrone, shopping, office, petCare, beauty, realEstate, sales, needs, other }
 
 String getCategoryName(TaskCategory cat) {
   switch(cat) {
@@ -17,6 +17,9 @@ String getCategoryName(TaskCategory cat) {
     case TaskCategory.office: return "Ofis / İnzibati İşlər";
     case TaskCategory.petCare: return "Heyvanlara Baxım";
     case TaskCategory.beauty: return "Gözəllik / Baxım";
+    case TaskCategory.realEstate: return "Daşınmaz Əmlak";
+    case TaskCategory.sales: return "Satış";
+    case TaskCategory.needs: return "Ehtiyacım Var";
     case TaskCategory.other: return "Digər";
   }
 }
@@ -51,6 +54,9 @@ class TaskItem {
         TaskCategory.office => Colors.blueGrey,
         TaskCategory.petCare => Colors.amber,
         TaskCategory.beauty => Colors.pink,
+        TaskCategory.realEstate => Colors.cyan,
+        TaskCategory.sales => Colors.deepOrange,
+        TaskCategory.needs => Colors.pinkAccent,
         TaskCategory.other => Colors.grey,
       };
 
@@ -67,6 +73,9 @@ class TaskItem {
         TaskCategory.office => Icons.business_center,
         TaskCategory.petCare => Icons.pets,
         TaskCategory.beauty => Icons.face_retouching_natural,
+        TaskCategory.realEstate => Icons.apartment,
+        TaskCategory.sales => Icons.sell,
+        TaskCategory.needs => Icons.volunteer_activism,
         TaskCategory.other => Icons.work,
       };
 }
