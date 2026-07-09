@@ -3,6 +3,11 @@
         android:label="maptask"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        
+        <!-- Google Maps API Açarı Bura Əlavə Edildi -->
+        <meta-data android:name="com.google.android.geo.API_KEY"
+                   android:value="AIzaSyCa-JWblENldb1sij3_xGuWpoI_MItykMs"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
