@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ƏLAVƏ OLUNDU
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -10,6 +11,21 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   double _balance = 15.50;
+
+  // ÇIXIŞ FUNKSİYASI (FİREBASE İLƏ)
+  void _handleLogout() async {
+    // 1. Firebase-dən çıx
+    await FirebaseAuth.instance.signOut(); 
+    
+    // 2. Tətbiqi tamamilə təmizləyib Main (yəni AuthGate) ekranına qaytar
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(
+        context, 
+        '/', // Kök səhifəyə qayıt
+        (route) => false, // Bütün arxa pəncərələri sil
+      );
+    }
+  }
 
   void _addBalanceDialog() {
     showDialog(
@@ -70,7 +86,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: double.infinity, height: 50,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade50, foregroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), elevation: 0),
-                onPressed: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false),
+                onPressed: _handleLogout, // YENİLƏNDİ
                 child: const Text("Hesabdan Çıx", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),

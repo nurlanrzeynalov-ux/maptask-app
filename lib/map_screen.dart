@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'chat_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -11,7 +13,7 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   static const CameraPosition _initialPosition = CameraPosition(
-    target: LatLng(40.4093, 49.8671), // Bakı
+    target: LatLng(40.4093, 49.8671),
     zoom: 14.0,
   );
 
@@ -19,8 +21,6 @@ class _MapScreenState extends State<MapScreen> {
   final List<String> _categories = ["Hamısı", "Kuryer", "Təmizlik", "Təmir", "Daşınma"];
   
   final Set<Marker> _markers = {};
-  
-  // XƏRİTƏNİN MƏRKƏZ KOORDİNATI (Müştəri xəritəni sürüşdürdükcə bu yenilənəcək)
   LatLng _currentCenter = _initialPosition.target;
 
   @override
@@ -29,8 +29,13 @@ class _MapScreenState extends State<MapScreen> {
     _listenToTasks(); 
   }
 
+  // YENİLƏNDİ: Yalnız statusu "active" olanları göstər
   void _listenToTasks() {
-    FirebaseFirestore.instance.collection('tasks').snapshots().listen((snapshot) {
+    FirebaseFirestore.instance
+        .collection('tasks')
+        .where('status', isEqualTo: 'active') // BURA ƏLAVƏ OLUNDU
+        .snapshots()
+        .listen((snapshot) {
       final Set<Marker> newMarkers = {};
       
       for (var doc in snapshot.docs) {
@@ -41,12 +46,14 @@ class _MapScreenState extends State<MapScreen> {
           final String title = data['title']?.toString() ?? 'Sifariş';
           final String desc = data['desc']?.toString() ?? 'Məlumat yoxdur';
           final String price = data['price']?.toString() ?? '0 ₼';
+          
+          final String taskId = doc.id; 
 
           newMarkers.add(
             Marker(
-              markerId: MarkerId(doc.id),
+              markerId: MarkerId(taskId),
               position: LatLng(lat, lng),
-              onTap: () => _showTaskDetails(title, desc, price),
+              onTap: () => _showTaskDetails(taskId, title, desc, price),
             ),
           );
         } catch (e) {
@@ -63,7 +70,16 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  // YENİLƏNDİ: Sifarişi yaradanın ID-si də bazaya yazılır
   Future<void> _addNewTask(String title, String desc, String price, LatLng location) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sifariş yaratmaq üçün daxil olun!'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     await FirebaseFirestore.instance.collection('tasks').add({
       'title': title,
       'desc': desc,
@@ -71,6 +87,8 @@ class _MapScreenState extends State<MapScreen> {
       'lat': location.latitude,
       'lng': location.longitude,
       'createdAt': FieldValue.serverTimestamp(),
+      'status': 'active', 
+      'creatorId': user.uid, // BURA ƏLAVƏ OLUNDU (Bunu kimin yaratdığını bilmək üçün)
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -101,7 +119,6 @@ class _MapScreenState extends State<MapScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
             onPressed: () {
               if (titleCtrl.text.isNotEmpty) {
-                // Sifarişi birbaşa ekranın mərkəz koordinatına göndəririk
                 _addNewTask(titleCtrl.text, descCtrl.text, "${priceCtrl.text} ₼", _currentCenter);
                 Navigator.pop(context);
               }
@@ -113,7 +130,97 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  void _showTaskDetails(String title, String desc, String price) {
+  void _showOfferDialog(String taskId, String title, String originalPrice) {
+    final priceCtrl = TextEditingController(text: originalPrice.replaceAll(RegExp(r'[^0-9]'), '')); 
+    final msgCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Təklifini Göndər", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("Sifariş: $title", style: const TextStyle(color: Colors.grey, fontSize: 14)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: priceCtrl, 
+              keyboardType: TextInputType.number, 
+              decoration: const InputDecoration(
+                labelText: "Sənin Qiymətin (₼)", 
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.payments_outlined),
+              )
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: msgCtrl, 
+              maxLines: 3, 
+              decoration: const InputDecoration(
+                labelText: "Müştəriyə mesajın...", 
+                border: OutlineInputBorder(),
+                alignLabelWithHint: true,
+              )
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Ləğv et", style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            onPressed: () async {
+              if (priceCtrl.text.isNotEmpty && msgCtrl.text.isNotEmpty) {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Təklif göndərmək üçün hesabınıza daxil olmalısınız!")));
+                  return;
+                }
+
+                try {
+                  await FirebaseFirestore.instance
+                      .collection('tasks')
+                      .doc(taskId)
+                      .collection('offers')
+                      .add({
+                    'courierId': user.uid, 
+                    'offerPrice': priceCtrl.text,
+                    'message': msgCtrl.text,
+                    'status': 'pending', 
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+
+                  if (mounted) {
+                    Navigator.pop(context); 
+                    Navigator.pop(context); 
+                    
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatScreen(
+  taskId: taskId, // BAX BUNU YAZDIQ
+                          userName: title, 
+                          offerPrice: priceCtrl.text,
+                          initialMessage: msgCtrl.text,
+                        ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Xəta baş verdi, interneti yoxlayıb yenidən cəhd edin.")));
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zəhmət olmasa qiymət və mesajı tam yazın!")));
+              }
+            },
+            child: const Text("Təklif Göndər", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTaskDetails(String taskId, String title, String desc, String price) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -142,12 +249,9 @@ class _MapScreenState extends State<MapScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sifariş qəbul edildi!"), backgroundColor: Colors.black));
-                  },
-                  child: const Text("Qəbul Et", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  onPressed: () => _showOfferDialog(taskId, title, price),
+                  child: const Text("Təklif Göndər", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               )
             ],
@@ -168,17 +272,14 @@ class _MapScreenState extends State<MapScreen> {
             zoomControlsEnabled: false,
             myLocationButtonEnabled: false,
             markers: _markers,
-            
-            // XƏRİTƏNİ SÜRÜŞDÜRDÜKCƏ MƏRKƏZ KOORDİNATI YENİLƏNİR
             onCameraMove: (CameraPosition position) {
               _currentCenter = position.target;
             },
           ),
           
-          // EKRANIN TƏN ORTASINDA DAYANAN SABİT MAVİ PİN
           const Center(
             child: Padding(
-              padding: EdgeInsets.only(bottom: 40.0), // Pinin ucu tam mərkəzə düşsün deyə yuxarı qaldırırıq
+              padding: EdgeInsets.only(bottom: 40.0), 
               child: Icon(Icons.location_on, size: 55, color: Colors.blueAccent),
             ),
           ),
