@@ -10,7 +10,7 @@ class ChatScreen extends StatefulWidget {
 
   const ChatScreen({
     super.key, 
-    required this.taskId, // YENİ ƏLAVƏ
+    required this.taskId, 
     required this.userName,
     required this.offerPrice,
     required this.initialMessage,
@@ -74,7 +74,88 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
-          // XƏRİTƏDƏN GƏLƏN İLK TƏKLİF QUTUSU (Həmişə ən üstdə qalır)
+          // YENİ ƏLAVƏ EDİLƏN STATUS DİNLƏYİCİ BLOKU (Ən yuxarıda görünəcək)
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance.collection('tasks').doc(widget.taskId).snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox();
+              
+              var taskData = snapshot.data!.data() as Map<String, dynamic>;
+              String status = taskData['status'] ?? 'active';
+              String creatorId = taskData['creatorId'] ?? '';
+              String acceptedCourierId = taskData['acceptedCourierId'] ?? '';
+              String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+              // 1. KURYER ÜÇÜN "İŞİ TAMAMLA" DÜYMƏSİ
+              if (status == 'in_progress' && currentUserId == acceptedCourierId) {
+                return Container(
+                  color: Colors.blue.shade50,
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Expanded(
+                        child: Text("İşi bitirdikdə hesabat göndərin", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                        onPressed: () {
+                          FirebaseFirestore.instance.collection('tasks').doc(widget.taskId).update({
+                            'status': 'pending_verification', // Təsdiqə göndərildi
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Hesabat müştəriyə göndərildi!")));
+                        },
+                        child: const Text("İşi Təhvil Ver", style: TextStyle(color: Colors.white)),
+                      )
+                    ],
+                  ),
+                );
+              }
+
+              // 2. MÜŞTƏRİ ÜÇÜN "TƏSDİQLƏ" DÜYMƏSİ (Kuryer işi təhvil verəndən sonra çıxır)
+              if (status == 'pending_verification' && currentUserId == creatorId) {
+                return Container(
+                  color: Colors.orange.shade50,
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Expanded(
+                        child: Text("Kuryer işi bitirdi.\nTəsdiqləyirsiniz?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                        onPressed: () {
+                          FirebaseFirestore.instance.collection('tasks').doc(widget.taskId).update({
+                            'status': 'completed', // İŞ TAM BAĞLANDI!
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sifariş tamamlandı və arxivləndi!")));
+                        },
+                        child: const Text("Təsdiqlə və Bağla", style: TextStyle(color: Colors.white)),
+                      )
+                    ],
+                  ),
+                );
+              }
+
+              // 3. İŞ BİTİBSƏ, HƏR İKİSİNƏ "TAMAMLANIB" YAZISI GÖSTƏRƏK
+              if (status == 'completed') {
+                return Container(
+                  width: double.infinity,
+                  color: Colors.green.shade100,
+                  padding: const EdgeInsets.all(12),
+                  child: const Center(
+                    child: Text("✅ Bu sifariş uğurla tamamlanmışdır.", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                  ),
+                );
+              }
+
+              // Əgər heç bir şərt ödənmirsə, boş yer qaytar
+              return const SizedBox();
+            },
+          ),
+
+          // XƏRİTƏDƏN GƏLƏN İLK TƏKLİF QUTUSU
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),

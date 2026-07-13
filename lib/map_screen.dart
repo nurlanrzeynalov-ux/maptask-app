@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geolocator/geolocator.dart'; 
+import 'dart:math' as math;
 import 'chat_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -12,6 +14,8 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
+  GoogleMapController? _mapController; 
+
   static const CameraPosition _initialPosition = CameraPosition(
     target: LatLng(40.4093, 49.8671),
     zoom: 14.0,
@@ -26,14 +30,56 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    _getUserLocation(); 
     _listenToTasks(); 
   }
 
-  // YENİLƏNDİ: Yalnız statusu "active" olanları göstər
+  Future<void> _getUserLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return; 
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+    
+    if (permission == LocationPermission.deniedForever) return;
+
+    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    LatLng realLatLng = LatLng(position.latitude, position.longitude);
+
+    if (mounted) {
+      setState(() {
+        _currentCenter = realLatLng; 
+      });
+
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: realLatLng, zoom: 15.0),
+        ),
+      );
+    }
+  }
+
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const p = 0.017453292519943295; 
+    final a = 0.5 - math.cos((lat2 - lat1) * p) / 2 +
+        math.cos(lat1 * p) * math.cos(lat2 * p) *
+        (1 - math.cos((lon2 - lon1) * p)) / 2;
+    return 12742 * math.asin(math.sqrt(a)); 
+  }
+
   void _listenToTasks() {
+    // 1. HAZIRDA SİSTEMƏ GİRƏN İSTİFADƏÇİNİN ID-SİNİ ALIRIQ
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid; 
+
     FirebaseFirestore.instance
         .collection('tasks')
-        .where('status', isEqualTo: 'active') // BURA ƏLAVƏ OLUNDU
+        .where('status', isEqualTo: 'active')
         .snapshots()
         .listen((snapshot) {
       final Set<Marker> newMarkers = {};
@@ -41,6 +87,15 @@ class _MapScreenState extends State<MapScreen> {
       for (var doc in snapshot.docs) {
         try {
           final data = doc.data();
+          
+          // 2. SİFARİŞİ YARADANIN ID-SİNİ BAZADAN OXUYURUQ
+          final String creatorId = data['creatorId']?.toString() ?? ''; 
+
+          // 3. ƏSAS ŞƏRT: ƏGƏR SİFARİŞİ YARADAN MƏNƏMSƏ, ONU XƏRİTƏYƏ QOYMA VƏ NÖVBƏTİNƏ KEÇ!
+          if (creatorId == currentUserId) {
+            continue; 
+          }
+
           final double lat = (data['lat'] as num).toDouble();
           final double lng = (data['lng'] as num).toDouble();
           final String title = data['title']?.toString() ?? 'Sifariş';
@@ -49,13 +104,22 @@ class _MapScreenState extends State<MapScreen> {
           
           final String taskId = doc.id; 
 
-          newMarkers.add(
-            Marker(
-              markerId: MarkerId(taskId),
-              position: LatLng(lat, lng),
-              onTap: () => _showTaskDetails(taskId, title, desc, price),
-            ),
+          final double distance = _calculateDistance(
+            _currentCenter.latitude, 
+            _currentCenter.longitude, 
+            lat, 
+            lng
           );
+
+          if (distance <= 5.0) { 
+            newMarkers.add(
+              Marker(
+                markerId: MarkerId(taskId),
+                position: LatLng(lat, lng),
+                onTap: () => _showTaskDetails(taskId, title, desc, price),
+              ),
+            );
+          }
         } catch (e) {
           debugPrint("XƏTA: Pin oxunmadı - $e");
         }
@@ -70,15 +134,9 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  // YENİLƏNDİ: Sifarişi yaradanın ID-si də bazaya yazılır
   Future<void> _addNewTask(String title, String desc, String price, LatLng location) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sifariş yaratmaq üçün daxil olun!'), backgroundColor: Colors.red),
-      );
-      return;
-    }
+    if (user == null) return;
 
     await FirebaseFirestore.instance.collection('tasks').add({
       'title': title,
@@ -88,7 +146,7 @@ class _MapScreenState extends State<MapScreen> {
       'lng': location.longitude,
       'createdAt': FieldValue.serverTimestamp(),
       'status': 'active', 
-      'creatorId': user.uid, // BURA ƏLAVƏ OLUNDU (Bunu kimin yaratdığını bilmək üçün)
+      'creatorId': user.uid, 
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -172,10 +230,7 @@ class _MapScreenState extends State<MapScreen> {
             onPressed: () async {
               if (priceCtrl.text.isNotEmpty && msgCtrl.text.isNotEmpty) {
                 final user = FirebaseAuth.instance.currentUser;
-                if (user == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Təklif göndərmək üçün hesabınıza daxil olmalısınız!")));
-                  return;
-                }
+                if (user == null) return;
 
                 try {
                   await FirebaseFirestore.instance
@@ -193,24 +248,13 @@ class _MapScreenState extends State<MapScreen> {
                   if (mounted) {
                     Navigator.pop(context); 
                     Navigator.pop(context); 
-                    
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ChatScreen(
-  taskId: taskId, // BAX BUNU YAZDIQ
-                          userName: title, 
-                          offerPrice: priceCtrl.text,
-                          initialMessage: msgCtrl.text,
-                        ),
-                      ),
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("✅ Təklifiniz göndərildi! Müştəri qəbul edənədək gözləyin."), backgroundColor: Colors.green),
                     );
                   }
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Xəta baş verdi, interneti yoxlayıb yenidən cəhd edin.")));
                 }
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zəhmət olmasa qiymət və mesajı tam yazın!")));
               }
             },
             child: const Text("Təklif Göndər", style: TextStyle(color: Colors.white)),
@@ -268,12 +312,16 @@ class _MapScreenState extends State<MapScreen> {
         children: [
           GoogleMap(
             initialCameraPosition: _initialPosition,
-            myLocationEnabled: true,
+            myLocationEnabled: true, 
             zoomControlsEnabled: false,
             myLocationButtonEnabled: false,
             markers: _markers,
+            onMapCreated: (controller) {
+              _mapController = controller; 
+            },
             onCameraMove: (CameraPosition position) {
               _currentCenter = position.target;
+              _listenToTasks(); 
             },
           ),
           
@@ -316,6 +364,20 @@ class _MapScreenState extends State<MapScreen> {
                   );
                 },
               ),
+            ),
+          ),
+          
+          Positioned(
+            bottom: 100, 
+            right: 16,
+            child: FloatingActionButton(
+              heroTag: "myLocationBtn", 
+              backgroundColor: Colors.white,
+              elevation: 5,
+              onPressed: () {
+                _getUserLocation(); 
+              },
+              child: const Icon(Icons.my_location, color: Colors.black, size: 28),
             ),
           ),
         ],

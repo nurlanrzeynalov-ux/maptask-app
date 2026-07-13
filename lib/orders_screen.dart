@@ -9,32 +9,39 @@ class OrdersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 2, // İki bölməmiz var
       child: Scaffold(
         backgroundColor: Colors.grey.shade50,
         appBar: AppBar(
-          title: const Text('Sifarişlərim', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          title: const Text('İşlərim və Sifarişlər', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           backgroundColor: Colors.white,
           elevation: 0,
           bottom: const TabBar(
+            isScrollable: true,
             indicatorColor: Colors.black, 
             labelColor: Colors.black, 
             unselectedLabelColor: Colors.grey,
             labelStyle: TextStyle(fontWeight: FontWeight.bold),
-            tabs: [Tab(text: "Aktiv Sifarişlər"), Tab(text: "Tamamlanmışlar")],
+            tabs: [
+              Tab(text: "Müştəri kimi (Sifarişlərim)"), 
+              Tab(text: "Kuryer kimi (İcra Etdiklərim)")
+            ],
           ),
         ),
-        body: TabBarView(children: [_buildActiveOrders(context), _buildCompletedOrders()]),
+        body: TabBarView(
+          children: [
+            _buildCustomerOrders(context), // 1. Müştəri ekranı
+            _buildCourierOrders(context),  // 2. Kuryer ekranı
+          ],
+        ),
       ),
     );
   }
 
-  // --- AKTİV SİFARİŞLƏR SİYAHISI (FİREBASE CANLI BAĞLANTI) ---
-  Widget _buildActiveOrders(BuildContext context) {
+  // --- 1. MÜŞTƏRİ KİMİ YARATDIĞIM SİFARİŞLƏR ---
+  Widget _buildCustomerOrders(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return const Center(child: Text("Sifarişləri görmək üçün daxil olun."));
-    }
+    if (user == null) return const Center(child: Text("Daxil olun."));
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -42,13 +49,9 @@ class OrdersScreen extends StatelessWidget {
           .where('creatorId', isEqualTo: user.uid)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Colors.black));
-        }
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Colors.black));
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(
-            child: Text("Hələ heç bir sifariş yaratmamısınız.", style: TextStyle(fontSize: 16, color: Colors.grey)),
-          );
+          return const Center(child: Text("Yaratdığınız sifariş yoxdur.", style: TextStyle(color: Colors.grey)));
         }
 
         final orders = snapshot.data!.docs;
@@ -57,78 +60,25 @@ class OrdersScreen extends StatelessWidget {
           padding: const EdgeInsets.all(20), 
           itemCount: orders.length,
           itemBuilder: (context, index) {
-            final orderDoc = orders[index];
-            final orderData = orderDoc.data() as Map<String, dynamic>;
-            final orderId = orderDoc.id;
-
+            final orderData = orders[index].data() as Map<String, dynamic>;
+            final orderId = orders[index].id;
             final title = orderData['title'] ?? 'Adsız Sifariş';
             final budget = orderData['price'] ?? '0';
-            
+            final status = orderData['status'] ?? 'active';
+
             return StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance.collection('tasks').doc(orderId).collection('offers').snapshots(),
               builder: (context, offerSnapshot) {
                 final offerCount = offerSnapshot.hasData ? offerSnapshot.data!.docs.length : 0;
                 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade200),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 4))]
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => _showBidsModal(context, orderId, title),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                                  child: const Row(
-                                    children: [
-                                      Icon(Icons.work_outline, size: 14, color: Colors.blue),
-                                      SizedBox(width: 6),
-                                      Text("Aktiv Sifariş", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue)),
-                                    ],
-                                  ),
-                                ),
-                                Text("$budget AZN", style: const TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider(height: 1)),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-                                      child: Text("$offerCount", style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Text("Təklif gəlib", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
-                                  ],
-                                ),
-                                const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey)
-                              ],
-                            )
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                return _buildCard(
+                  context: context,
+                  orderId: orderId,
+                  title: title,
+                  budget: budget.toString(),
+                  status: status,
+                  offerCount: offerCount,
+                  isCustomer: true,
                 );
               }
             );
@@ -138,19 +88,169 @@ class OrdersScreen extends StatelessWidget {
     );
   }
 
-  // --- TAMAMLANMIŞLAR SİYAHISI ---
-  Widget _buildCompletedOrders() => const Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.check_circle_outline, size: 60, color: Colors.grey),
-        SizedBox(height: 16),
-        Text("Tamamlanmış işiniz yoxdur.", style: TextStyle(fontSize: 16, color: Colors.black54, fontWeight: FontWeight.bold))
-      ],
-    )
-  );
+  // --- 2. KURYER KİMİ QƏBUL EDİLDİYİM İŞLƏR ---
+  Widget _buildCourierOrders(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const Center(child: Text("Daxil olun."));
 
-  // --- TƏKLİFLƏR PƏNCƏRƏSİ ---
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('tasks')
+          .where('acceptedCourierId', isEqualTo: user.uid) // Yalnız mənim udduğum işlər!
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Colors.black));
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Text(
+                "İcra etdiyiniz iş yoxdur.\n\nMüştəri təklifinizi qəbul etdikdən sonra Çata buradan daxil olacaqsınız.", 
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey, height: 1.5)
+              ),
+            )
+          );
+        }
+
+        final orders = snapshot.data!.docs;
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20), 
+          itemCount: orders.length,
+          itemBuilder: (context, index) {
+            final orderData = orders[index].data() as Map<String, dynamic>;
+            final orderId = orders[index].id;
+            final title = orderData['title'] ?? 'Adsız Sifariş';
+            // Əgər razılaşdırılmış qiymət varsa onu, yoxsa ilkin qiyməti göstər
+            final budget = orderData['agreedPrice'] ?? orderData['price'] ?? '0'; 
+            final status = orderData['status'] ?? 'active';
+
+            return _buildCard(
+              context: context,
+              orderId: orderId,
+              title: title,
+              budget: budget.toString(),
+              status: status,
+              offerCount: 0, // Kuryerə təklif sayı lazım deyil
+              isCustomer: false, // Bu Kuryerdir!
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- ÜMUMİ KART DİZAYNI ---
+  Widget _buildCard({
+    required BuildContext context, required String orderId, required String title, 
+    required String budget, required String status, required int offerCount, required bool isCustomer
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 4))]
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            if (status == 'active' && isCustomer) {
+              // Əgər iş aktivdirsə və müştəriyəmsə, təkliflər pəncərəsini aç
+              _showBidsModal(context, orderId, title);
+            } else {
+              // DİGƏR BÜTÜN HALLARDA (Kuryer üçün də) BİRBAŞA ÇAT AÇILIR!
+              Navigator.push(
+                context, 
+                MaterialPageRoute(
+                  builder: (_) => ChatScreen(
+                    taskId: orderId, 
+                    userName: isCustomer ? "Kuryer" : "Müştəri", // Qarşı tərəfin adı
+                    offerPrice: budget, 
+                    initialMessage: "",
+                  )
+                )
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildStatusBadge(status), 
+                    Text(budget.contains("AZN") ? budget : "$budget AZN", style: const TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                
+                // MÜŞTƏRİ ÜÇÜN AKTİV SİFARİŞ GÖRÜNÜŞÜ
+                if (status == 'active' && isCustomer) ...[
+                  const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider(height: 1)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+                            child: Text("$offerCount", style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text("Təklif gəlib", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                        ],
+                      ),
+                      const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey)
+                    ],
+                  )
+                ] 
+                // KURYER VƏ İCRA OLUNAN İŞLƏR ÜÇÜN ÇATA GİRİŞ
+                else ...[
+                   const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider(height: 1)),
+                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        status == 'completed' ? "İş yekunlaşıb (Söhbətə bax)" : "Çata daxil ol", 
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)
+                      ),
+                      const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.blueAccent)
+                    ],
+                  )
+                ]
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    Color bgColor; Color textColor; String label;
+    switch (status) {
+      case 'active': bgColor = Colors.blue.withOpacity(0.1); textColor = Colors.blue; label = "Aktiv Sifariş"; break;
+      case 'in_progress': bgColor = Colors.orange.withOpacity(0.1); textColor = Colors.orange.shade800; label = "İcradadır"; break;
+      case 'pending_verification': bgColor = Colors.purple.withOpacity(0.1); textColor = Colors.purple; label = "Təsdiq Gözləyir"; break;
+      case 'completed': bgColor = Colors.green.withOpacity(0.1); textColor = Colors.green; label = "Tamamlandı"; break;
+      default: bgColor = Colors.grey.withOpacity(0.1); textColor = Colors.grey; label = "Naməlum";
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
+      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+    );
+  }
+
   void _showBidsModal(BuildContext context, String orderId, String taskTitle) {
     showModalBottomSheet(
       context: context, 
@@ -172,12 +272,8 @@ class OrdersScreen extends StatelessWidget {
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance.collection('tasks').doc(orderId).collection('offers').orderBy('createdAt', descending: true).snapshots(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(child: Text("Hələ heç bir təklif gəlməyib."));
-                  }
+                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text("Hələ heç bir təklif gəlməyib."));
 
                   final bids = snapshot.data!.docs;
 
@@ -187,6 +283,7 @@ class OrdersScreen extends StatelessWidget {
                       final bidData = bids[index].data() as Map<String, dynamic>;
                       final price = bidData['offerPrice'] ?? '';
                       final msg = bidData['message'] ?? '';
+                      final courierId = bidData['courierId'] ?? ''; 
                       final courierName = "İcraçı"; 
 
                       return Container(
@@ -209,15 +306,9 @@ class OrdersScreen extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text("$price AZN", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
-                                  ],
-                                )
+                                Text("$price AZN", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green))
                               ],
                             ),
-                            
                             if (msg.toString().isNotEmpty) ...[
                               const SizedBox(height: 12),
                               Container(
@@ -229,7 +320,6 @@ class OrdersScreen extends StatelessWidget {
                                 ),
                               )
                             ],
-                            
                             const SizedBox(height: 16),
                             SizedBox(
                               width: double.infinity,
@@ -237,39 +327,28 @@ class OrdersScreen extends StatelessWidget {
                                 style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(vertical: 12)),
                                 onPressed: () async {
                                   try {
-                                    // 1. BAZADA SİFARİŞİN STATUSUNU YENİLƏYİRİK
-                                    await FirebaseFirestore.instance
-                                        .collection('tasks')
-                                        .doc(orderId)
-                                        .update({
-                                      'status': 'in_progress', // Status dəyişdi
-                                      'acceptedCourierId': bidData['courierId'] ?? '', 
+                                    await FirebaseFirestore.instance.collection('tasks').doc(orderId).update({
+                                      'status': 'in_progress', 
+                                      'acceptedCourierId': courierId, 
                                       'agreedPrice': price, 
                                     });
 
                                     if (context.mounted) {
                                       Navigator.pop(ctx); 
-                                      
                                       Navigator.push(
                                         context, 
                                         MaterialPageRoute(
                                           builder: (_) => ChatScreen(
-  taskId: orderId, // BAX BUNU DA BURA YAZDIQ
+                                            taskId: orderId, 
                                             userName: courierName,
                                             offerPrice: price.toString(),
                                             initialMessage: msg, 
                                           )
                                         )
                                       );
-                                      
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text("✅ Təklif qəbul edildi və xəritədən silindi!"), backgroundColor: Colors.green)
-                                      );
                                     }
                                   } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("Xəta baş verdi, yenidən cəhd edin."), backgroundColor: Colors.red)
-                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Xəta baş verdi"), backgroundColor: Colors.red));
                                   }
                                 }, 
                                 child: const Text("Təklifi Qəbul Et", style: TextStyle(fontWeight: FontWeight.bold))
