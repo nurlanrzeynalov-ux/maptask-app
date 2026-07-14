@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart'; // YENİ: Kamera və Qalereya
+import 'package:firebase_storage/firebase_storage.dart'; // YENİ: Şəkli bazaya yükləmək
+import 'dart:typed_data'; // YENİ: Şəkli byte kimi oxumaq üçün (Web dəstəyi)
 
 class ChatScreen extends StatefulWidget {
-  final String taskId; // YENİ: Çatın hansı sifarişə aid olduğunu bilmək üçün
+  final String taskId;
   final String userName; 
   final String offerPrice; 
   final String initialMessage; 
@@ -23,23 +26,77 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _msgController = TextEditingController();
   final String? _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  bool _isUploading = false; // YENİ: Yüklənmə animasiyası üçün
 
-  // MESAJI FİREBASE-Ə GÖNDƏRMƏK ÜÇÜN FUNKSİYA
+  // MESAJI FİREBASE-Ə GÖNDƏRMƏK
   Future<void> _sendMessage() async {
     if (_msgController.text.trim().isEmpty || _currentUserId == null) return;
     
     final text = _msgController.text.trim();
-    _msgController.clear(); // Ekranda dərhal silinsin
+    _msgController.clear(); 
     
     await FirebaseFirestore.instance
         .collection('tasks')
         .doc(widget.taskId)
-        .collection('messages') // Hər sifarişin öz mesajlar qovluğu
+        .collection('messages')
         .add({
       'text': text,
       'senderId': _currentUserId,
       'timestamp': FieldValue.serverTimestamp(),
     });
+  }
+
+  // YENİ FUNKSİYA: ŞƏKLİ ÇƏKİB HESABAT GÖNDƏRMƏK
+  Future<void> _uploadReportAndComplete() async {
+    final ImagePicker picker = ImagePicker();
+    
+    // 1. Şəkli seçirik və ya çəkirik
+    final XFile? image = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+    
+    if (image == null) return; // Şəkil çəkməkdən imtina etsə, dayanır
+
+    setState(() => _isUploading = true); // Yüklənir ikonunu aktiv edirik
+
+    try {
+      // 2. Şəkli byte formatında oxuyuruq (Chrome/Web-də işləməsi üçün ən yaxşı yol)
+      Uint8List imageData = await image.readAsBytes();
+
+      // 3. Firebase Storage-də yer ayırırıq
+      String fileName = "reports/${widget.taskId}_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      Reference storageRef = FirebaseStorage.instance.ref().child(fileName);
+
+      // 4. Şəkli yükləyirik və URL-ni alırıq
+      UploadTask uploadTask = storageRef.putData(imageData, SettableMetadata(contentType: 'image/jpeg'));
+      TaskSnapshot snapshot = await uploadTask;
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      // 5. İşin statusunu "Təsdiq Gözləyir" edirik
+      await FirebaseFirestore.instance.collection('tasks').doc(widget.taskId).update({
+        'status': 'pending_verification', 
+      });
+
+      // 6. Şəkli Çata göndəririk
+      await FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(widget.taskId)
+          .collection('messages')
+          .add({
+        'text': '📸 İcraçı işi bitirdi və hesabat göndərdi!', // Mətn
+        'imageUrl': downloadUrl, // Şəkil URL-i əlavə olunur!
+        'senderId': _currentUserId,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Hesabat uğurla göndərildi!"), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Xəta baş verdi: $e"), backgroundColor: Colors.red));
+      }
+    } finally {
+      setState(() => _isUploading = false);
+    }
   }
 
   @override
@@ -67,14 +124,10 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.call, color: Colors.black87), onPressed: () {}),
-          const SizedBox(width: 8),
-        ],
       ),
       body: Column(
         children: [
-          // YENİ ƏLAVƏ EDİLƏN STATUS DİNLƏYİCİ BLOKU (Ən yuxarıda görünəcək)
+          // STATUS DİNLƏYİCİ BLOKU (Ağıllı Düymələr)
           StreamBuilder<DocumentSnapshot>(
             stream: FirebaseFirestore.instance.collection('tasks').doc(widget.taskId).snapshots(),
             builder: (context, snapshot) {
@@ -84,10 +137,9 @@ class _ChatScreenState extends State<ChatScreen> {
               String status = taskData['status'] ?? 'active';
               String creatorId = taskData['creatorId'] ?? '';
               String acceptedCourierId = taskData['acceptedCourierId'] ?? '';
-              String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
               // 1. KURYER ÜÇÜN "İŞİ TAMAMLA" DÜYMƏSİ
-              if (status == 'in_progress' && currentUserId == acceptedCourierId) {
+              if (status == 'in_progress' && _currentUserId == acceptedCourierId) {
                 return Container(
                   color: Colors.blue.shade50,
                   padding: const EdgeInsets.all(12),
@@ -97,23 +149,21 @@ class _ChatScreenState extends State<ChatScreen> {
                       const Expanded(
                         child: Text("İşi bitirdikdə hesabat göndərin", style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
-                      ElevatedButton(
+                      ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-                        onPressed: () {
-                          FirebaseFirestore.instance.collection('tasks').doc(widget.taskId).update({
-                            'status': 'pending_verification', // Təsdiqə göndərildi
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Hesabat müştəriyə göndərildi!")));
-                        },
-                        child: const Text("İşi Təhvil Ver", style: TextStyle(color: Colors.white)),
+                        onPressed: _isUploading ? null : _uploadReportAndComplete, // Kamera funksiyasına bağlandı!
+                        icon: _isUploading 
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                            : const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                        label: const Text("Təhvil Ver", style: TextStyle(color: Colors.white)),
                       )
                     ],
                   ),
                 );
               }
 
-              // 2. MÜŞTƏRİ ÜÇÜN "TƏSDİQLƏ" DÜYMƏSİ (Kuryer işi təhvil verəndən sonra çıxır)
-              if (status == 'pending_verification' && currentUserId == creatorId) {
+              // 2. MÜŞTƏRİ ÜÇÜN "TƏSDİQLƏ" DÜYMƏSİ 
+              if (status == 'pending_verification' && _currentUserId == creatorId) {
                 return Container(
                   color: Colors.orange.shade50,
                   padding: const EdgeInsets.all(12),
@@ -127,9 +177,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                         onPressed: () {
                           FirebaseFirestore.instance.collection('tasks').doc(widget.taskId).update({
-                            'status': 'completed', // İŞ TAM BAĞLANDI!
+                            'status': 'completed', 
                           });
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sifariş tamamlandı və arxivləndi!")));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sifariş tamamlandı və arxivləndi!"), backgroundColor: Colors.green));
                         },
                         child: const Text("Təsdiqlə və Bağla", style: TextStyle(color: Colors.white)),
                       )
@@ -138,7 +188,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 );
               }
 
-              // 3. İŞ BİTİBSƏ, HƏR İKİSİNƏ "TAMAMLANIB" YAZISI GÖSTƏRƏK
+              // 3. İŞ BİTİBSƏ
               if (status == 'completed') {
                 return Container(
                   width: double.infinity,
@@ -149,26 +199,20 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 );
               }
-
-              // Əgər heç bir şərt ödənmirsə, boş yer qaytar
               return const SizedBox();
             },
           ),
 
-          // XƏRİTƏDƏN GƏLƏN İLK TƏKLİF QUTUSU
+          // İLK TƏKLİF QUTUSU
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.shade200)
-            ),
+            decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.shade200)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Təklif: ${widget.offerPrice} ₼", style:  TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue.shade900)),
+                Text("Təklif: ${widget.offerPrice}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue.shade900)),
                 if(widget.initialMessage.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(widget.initialMessage, style: TextStyle(fontSize: 14, color: Colors.blue.shade800)),
@@ -177,35 +221,33 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
 
-          // REAL-TIME FİREBASE MESAJLARI (CANLI DİNLƏMƏ)
+          // REAL-TIME ÇAT VƏ ŞƏKİLLƏRİN GÖSTƏRİLMƏSİ
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('tasks')
                   .doc(widget.taskId)
                   .collection('messages')
-                  .orderBy('timestamp', descending: true) // WhatsApp kimi, ən yenilər aşağıda
+                  .orderBy('timestamp', descending: true) 
                   .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("Hələ mesaj yoxdur. Söhbətə başlayın!", style: TextStyle(color: Colors.grey)));
+                  return const Center(child: Text("Hələ mesaj yoxdur.", style: TextStyle(color: Colors.grey)));
                 }
 
                 final messages = snapshot.data!.docs;
 
                 return ListView.builder(
-                  reverse: true, // Ekranı aşağıdan yuxarı doldurur
+                  reverse: true, 
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index].data() as Map<String, dynamic>;
-                    final isMe = msg['senderId'] == _currentUserId; // Mesajın bizə aid olub olmadığını yoxlayır
+                    final isMe = msg['senderId'] == _currentUserId; 
                     final text = msg['text'] ?? '';
+                    final imageUrl = msg['imageUrl']; // YENİ: Şəkil varmı yoxlayırıq
                     
-                    // Vaxt formatı (serverdən gələn timestamp)
                     String timeString = "İndi";
                     if (msg['timestamp'] != null) {
                       final DateTime dt = (msg['timestamp'] as Timestamp).toDate();
@@ -227,13 +269,20 @@ class _ChatScreenState extends State<ChatScreen> {
                             bottomRight: Radius.circular(isMe ? 0 : 16),
                           ),
                           border: isMe ? null : Border.all(color: Colors.grey.shade200),
-                          boxShadow: [
-                            if (!isMe) BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5, offset: const Offset(0, 2))
-                          ],
+                          boxShadow: [if (!isMe) BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5, offset: const Offset(0, 2))],
                         ),
                         child: Column(
                           crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                           children: [
+                            // ƏGƏR ŞƏKİL VARSA, ÇATDA GÖSTƏRİRİK
+                            if (imageUrl != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(imageUrl, width: 200, fit: BoxFit.cover),
+                                ),
+                              ),
                             Text(text, style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 15)),
                             const SizedBox(height: 4),
                             Text(timeString, style: TextStyle(color: isMe ? Colors.white70 : Colors.grey, fontSize: 10)),
@@ -247,25 +296,13 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           
-          // AŞAĞIDAKI MESAJ YAZMA PANELİ
+          // MESAJ YAZMA PANELİ
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Colors.grey.shade200)),
-            ),
+            decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey.shade200))),
             child: SafeArea(
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () {}, 
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
-                      child: Icon(Icons.add_photo_alternate_outlined, color: Colors.grey.shade700, size: 22),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
                       controller: _msgController,
@@ -281,7 +318,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(width: 12),
                   GestureDetector(
-                    onTap: _sendMessage, // FİREBASE GÖNDƏRİM FUNKSİYASINA BAĞLANDI
+                    onTap: _sendMessage, 
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
